@@ -35,58 +35,65 @@ class _TaskListScreenState extends State<TaskListScreen> {
     final isDark = provider.isDarkMode;
     final tasks = provider.filteredTasks;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Workspace Tasks',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
+              // Header
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (provider.isSupabaseConfigured && provider.isLoggedIn)
-                    IconButton(
-                      icon: provider.isSyncing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-                              ),
-                            )
-                          : const Icon(Icons.sync),
-                      tooltip: 'Sync with Cloud Database',
-                      onPressed: provider.isSyncing
-                          ? null
-                          : () async {
-                              await provider.refreshFromSupabase();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Tasks synced successfully with Supabase!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            },
+                  Expanded(
+                    child: Text(
+                      'Workspace Tasks',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.add_task),
-                    tooltip: 'Add Task',
-                    onPressed: () => _showTaskEditorSheet(context, null),
+                  ),
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      if (provider.isSupabaseConfigured && provider.isLoggedIn)
+                        IconButton(
+                          icon: provider.isSyncing
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                  ),
+                                )
+                              : const Icon(Icons.sync),
+                          tooltip: 'Sync with Cloud Database',
+                          onPressed: provider.isSyncing
+                              ? null
+                              : () async {
+                                  await provider.refreshFromSupabase();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Tasks synced successfully with Supabase!'),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                },
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.add_task),
+                        tooltip: 'Add Task',
+                        onPressed: () => _showTaskEditorSheet(context, null),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
           // Search Bar
           TextField(
@@ -422,7 +429,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
           ),
         ],
       ),
-    );
+    )));
   }
 
   Widget _buildFilterChip({

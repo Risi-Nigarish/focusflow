@@ -76,77 +76,144 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 900;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting & Date Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${_getGreeting()},\n${provider.clientName ?? 'Workspace'}',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            height: 1.1,
-                            fontWeight: FontWeight.w900,
+              // Greeting & Date Header (Responsive Layout)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = constraints.maxWidth < 600;
+                  if (isMobile) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_getGreeting()}, ${provider.clientName ?? 'Workspace'}',
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                          height: 1.1,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    formattedDate,
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _buildSyncIndicator(context, provider, isDark),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: AppTheme.glassDecoration(isDark: isDark, radius: 12),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle_outline, color: AppTheme.darkSecondary, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$completed/$total Completed',
+                                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                          color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_getGreeting()},\n${provider.clientName ?? 'Workspace'}',
+                                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                      height: 1.1,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formattedDate,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
                           ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedDate,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Cloud Sync Status Indicator
-              _buildSyncIndicator(context, provider, isDark),
-              const SizedBox(width: 12),
-              // Mini statistics indicator
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: AppTheme.glassDecoration(isDark: isDark, radius: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline, color: AppTheme.darkSecondary, size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$completed/$total Completed',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildSyncIndicator(context, provider, isDark),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: AppTheme.glassDecoration(isDark: isDark, radius: 12),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline, color: AppTheme.darkSecondary, size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$completed/$total Completed',
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                    ),
+                              ),
+                            ],
                           ),
-                    ),
-                  ],
-                ),
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
+              const SizedBox(height: 32),
+
+              // Main Layout split for desktop/mobile
+              isDesktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: _buildLeftColumn(provider, isDark)),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 2, child: _buildRightColumn(provider, isDark)),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildLeftColumn(provider, isDark),
+                        const SizedBox(height: 24),
+                        _buildRightColumn(provider, isDark),
+                      ],
+                    ),
             ],
           ),
-          const SizedBox(height: 32),
-
-          // Main Layout split for desktop/mobile
-          isDesktop
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 3, child: _buildLeftColumn(provider, isDark)),
-                    const SizedBox(width: 24),
-                    Expanded(flex: 2, child: _buildRightColumn(provider, isDark)),
-                  ],
-                )
-              : Column(
-                  children: [
-                    _buildLeftColumn(provider, isDark),
-                    const SizedBox(height: 24),
-                    _buildRightColumn(provider, isDark),
-                  ],
-                ),
-        ],
+        ),
       ),
     );
   }
@@ -463,82 +530,166 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  // Donut chart
-                  SizedBox(
-                    height: 140,
-                    width: 140,
-                    child: Stack(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final useVerticalLayout = constraints.maxWidth < 450;
+                  if (useVerticalLayout) {
+                    return Column(
                       children: [
-                        PieChart(
-                          PieChartData(
-                            sectionsSpace: 4,
-                            centerSpaceRadius: 50,
-                            startDegreeOffset: -90,
-                            sections: [
-                              PieChartSectionData(
-                                color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
-                                value: completed == 0 && pending == 0 ? 1 : completed.toDouble(),
-                                title: '',
-                                radius: 14,
-                              ),
-                              PieChartSectionData(
-                                color: Colors.grey.withOpacity(isDark ? 0.15 : 0.25),
-                                value: completed == 0 && pending == 0 ? 0 : pending.toDouble(),
-                                title: '',
-                                radius: 10,
-                              ),
-                            ],
-                          ),
-                        ),
+                        // Center Pie Chart
                         Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: SizedBox(
+                            height: 140,
+                            width: 140,
+                            child: Stack(
+                              children: [
+                                PieChart(
+                                  PieChartData(
+                                    sectionsSpace: 4,
+                                    centerSpaceRadius: 50,
+                                    startDegreeOffset: -90,
+                                    sections: [
+                                      PieChartSectionData(
+                                        color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
+                                        value: completed == 0 && pending == 0 ? 1 : completed.toDouble(),
+                                        title: '',
+                                        radius: 14,
+                                      ),
+                                      PieChartSectionData(
+                                        color: Colors.grey.withOpacity(isDark ? 0.15 : 0.25),
+                                        value: completed == 0 && pending == 0 ? 0 : pending.toDouble(),
+                                        title: '',
+                                        radius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '$ratePercent%',
+                                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      Text(
+                                        'Done',
+                                        style: Theme.of(context).textTheme.labelLarge,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Stats details list below
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildStatIndicator(
+                              color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
+                              label: 'Completed Tasks',
+                              value: '$completed',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildStatIndicator(
+                              color: Colors.grey.withOpacity(0.5),
+                              label: 'Pending Tasks',
+                              value: '$pending',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildStatIndicator(
+                              color: isDark ? AppTheme.darkAccent : AppTheme.lightAccent,
+                              label: 'Total Active Tasks',
+                              value: '${provider.totalCount}',
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  } else {
+                    // Desktop/Tablet horizontal layout
+                    return Row(
+                      children: [
+                        SizedBox(
+                          height: 140,
+                          width: 140,
+                          child: Stack(
                             children: [
-                              Text(
-                                '$ratePercent%',
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.w800,
+                              PieChart(
+                                PieChartData(
+                                  sectionsSpace: 4,
+                                  centerSpaceRadius: 50,
+                                  startDegreeOffset: -90,
+                                  sections: [
+                                    PieChartSectionData(
+                                      color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
+                                      value: completed == 0 && pending == 0 ? 1 : completed.toDouble(),
+                                      title: '',
+                                      radius: 14,
                                     ),
+                                    PieChartSectionData(
+                                      color: Colors.grey.withOpacity(isDark ? 0.15 : 0.25),
+                                      value: completed == 0 && pending == 0 ? 0 : pending.toDouble(),
+                                      title: '',
+                                      radius: 10,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              Text(
-                                'Done',
-                                style: Theme.of(context).textTheme.labelLarge,
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '$ratePercent%',
+                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                    Text(
+                                      'Done',
+                                      style: Theme.of(context).textTheme.labelLarge,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 32),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildStatIndicator(
+                                color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
+                                label: 'Completed Tasks',
+                                value: '$completed',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildStatIndicator(
+                                color: Colors.grey.withOpacity(0.5),
+                                label: 'Pending Tasks',
+                                value: '$pending',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildStatIndicator(
+                                color: isDark ? AppTheme.darkAccent : AppTheme.lightAccent,
+                                label: 'Total Active Tasks',
+                                value: '${provider.totalCount}',
                               ),
                             ],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 32),
-                  // Legends and stats details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildStatIndicator(
-                          color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
-                          label: 'Completed Tasks',
-                          value: '$completed',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatIndicator(
-                          color: Colors.grey.withOpacity(0.5),
-                          label: 'Pending Tasks',
-                          value: '$pending',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatIndicator(
-                          color: isDark ? AppTheme.darkAccent : AppTheme.lightAccent,
-                          label: 'Total Active Tasks',
-                          value: '${provider.totalCount}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -808,10 +959,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Monitored Reminders',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Text(
+                                'Monitored Reminders',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(

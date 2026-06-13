@@ -129,62 +129,67 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final isDesktop = size.width > 850 && size.height > 600;
 
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: isDesktop
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Text(
-                  'Visual Planner',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Plan tasks and view scheduled reminders visually.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: Row(
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: isDesktop ? 1200 : 800),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: isDesktop
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Text(
+                      'Visual Planner',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Plan tasks and view scheduled reminders visually.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: _buildCalendarCard(isDark, allTasks),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 4,
+                            child: _buildDayTaskList(isDark, selectedDayTasks, provider, isMobile: false),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : SingleChildScrollView(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 5,
-                        child: _buildCalendarCard(isDark, allTasks),
+                      // Header
+                      Text(
+                        'Visual Planner',
+                        style: Theme.of(context).textTheme.headlineMedium,
                       ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 4,
-                        child: _buildDayTaskList(isDark, selectedDayTasks, provider, isMobile: false),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Plan tasks and view scheduled reminders visually.',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
+                      const SizedBox(height: 24),
+                      _buildCalendarCard(isDark, allTasks),
+                      const SizedBox(height: 24),
+                      _buildDayTaskList(isDark, selectedDayTasks, provider, isMobile: true),
                     ],
                   ),
                 ),
-              ],
-            )
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Text(
-                    'Visual Planner',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Plan tasks and view scheduled reminders visually.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  _buildCalendarCard(isDark, allTasks),
-                  const SizedBox(height: 24),
-                  _buildDayTaskList(isDark, selectedDayTasks, provider, isMobile: true),
-                ],
-              ),
-            ),
+        ),
+      ),
     );
   }
 
@@ -686,30 +691,41 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 2),
-                                      Row(
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
-                                          Container(
-                                            width: 6,
-                                            height: 6,
-                                            decoration: BoxDecoration(
-                                              color: catColor,
-                                              shape: BoxShape.circle,
-                                            ),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 6,
+                                                height: 6,
+                                                decoration: BoxDecoration(
+                                                  color: catColor,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                task.category,
+                                                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            task.category,
-                                            style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                                          ),
-                                          if (task.dueDate != null) ...[
-                                            const SizedBox(width: 12),
-                                            Icon(Icons.event, size: 10, color: Colors.grey[500]),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              'Due: ${DateFormat('MMM d').format(task.dueDate!)}',
-                                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                          if (task.dueDate != null)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.event, size: 10, color: Colors.grey[500]),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  'Due: ${DateFormat('MMM d').format(task.dueDate!)}',
+                                                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                                ),
+                                              ],
                                             ),
-                                          ],
                                         ],
                                       ),
                                       if (task.reminders.isNotEmpty) ...[
@@ -829,30 +845,41 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                             ),
                                           ),
                                           const SizedBox(height: 2),
-                                          Row(
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            crossAxisAlignment: WrapCrossAlignment.center,
                                             children: [
-                                              Container(
-                                                width: 6,
-                                                height: 6,
-                                                decoration: BoxDecoration(
-                                                  color: catColor,
-                                                  shape: BoxShape.circle,
-                                                ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    width: 6,
+                                                    height: 6,
+                                                    decoration: BoxDecoration(
+                                                      color: catColor,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    task.category,
+                                                    style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                task.category,
-                                                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                                              ),
-                                              if (task.dueDate != null) ...[
-                                                const SizedBox(width: 12),
-                                                Icon(Icons.event, size: 10, color: Colors.grey[500]),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  'Due: ${DateFormat('MMM d').format(task.dueDate!)}',
-                                                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                              if (task.dueDate != null)
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.event, size: 10, color: Colors.grey[500]),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      'Due: ${DateFormat('MMM d').format(task.dueDate!)}',
+                                                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
                                             ],
                                           ),
                                           if (task.reminders.isNotEmpty) ...[
