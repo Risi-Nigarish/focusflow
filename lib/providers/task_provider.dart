@@ -21,6 +21,7 @@ class TaskProvider extends ChangeNotifier {
   String? _username;
   String? _clientName;
   Timer? _cleanupTimer;
+  bool _isSyncing = false;
 
   // Filters and Sorting
   String _searchQuery = '';
@@ -35,6 +36,7 @@ class TaskProvider extends ChangeNotifier {
   bool get isDarkMode => _isDarkMode;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
+  bool get isSyncing => _isSyncing;
   String? get username => _username;
   String? get clientName => _clientName;
   bool get isSupabaseConfigured => _supabaseService.isActive;
@@ -138,31 +140,124 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Refreshes tasks and categories from Supabase into memory and updates local cache
+  /// Refreshes tasks and categories from Supabase, merging local and remote data
   Future<void> refreshFromSupabase() async {
     if (!_supabaseService.isActive || !_supabaseService.isLoggedIn) return;
+    _isSyncing = true;
+    notifyListeners();
+    
     try {
       final remoteTasks = await _supabaseService.loadTasks();
-      _tasks = remoteTasks;
-      await _storageService.saveTasks(_tasks);
+      final localTasks = await _storageService.loadTasks();
+      final deletedIds = await _storageService.loadDeletedTaskIds();
       
-      final remoteCategories = await _supabaseService.loadCategories();
-      if (remoteCategories.isNotEmpty) {
-        _categories = remoteCategories;
-        await _storageService.saveCategories(_categories);
-      } else {
-        // Remote categories are empty. Seed default categories locally and sync them to Supabase!
-        _categories = await _storageService.loadCategories();
-        for (var entry in _categories.entries) {
-          try {
-            await _supabaseService.insertCategory(entry.key, entry.value);
-          } catch (e) {
-            debugPrint('Failed to sync default category ${entry.key} to Supabase: $e');
+      // 1. Process offline deletions first
+      final List<String> successfullyDeleted = [];
+      for (var id in deletedIds) {
+        try {
+          await _supabaseService.deleteTask(id);
+          successfullyDeleted.add(id);
+        } catch (e) {
+          debugPrint('Failed to sync offline deletion for task $id: $e');
+        }
+      }
+      if (successfullyDeleted.isNotEmpty) {
+        deletedIds.removeWhere((id) => successfullyDeleted.contains(id));
+        await _storageService.saveDeletedTaskIds(deletedIds);
+      }
+      
+      final Map<String, Task> mergedTasks = {};
+      
+      // 2. Put all remote tasks in the map (unless they were deleted locally offline)
+      for (var task in remoteTasks) {
+        if (!deletedIds.contains(task.id)) {
+          mergedTasks[task.id] = task;
+        }
+      }
+      
+      // 3. Process local tasks
+      final List<Task> toUpload = [];
+      final List<Task> toUpdateRemote = [];
+      
+      for (var localTask in localTasks) {
+        if (deletedIds.contains(localTask.id)) {
+          // This task was deleted locally, skip it
+          continue;
+        }
+        
+        if (!mergedTasks.containsKey(localTask.id)) {
+          // Local-only task: user created this task while offline/guest.
+          // Add it to merged tasks and mark for upload.
+          mergedTasks[localTask.id] = localTask;
+          toUpload.add(localTask);
+        } else {
+          final remoteTask = mergedTasks[localTask.id]!;
+          // Task exists in both: check if they differ
+          if (localTask.isCompleted != remoteTask.isCompleted ||
+              localTask.title != remoteTask.title ||
+              localTask.description != remoteTask.description ||
+              localTask.dueDate?.millisecondsSinceEpoch != remoteTask.dueDate?.millisecondsSinceEpoch ||
+              localTask.priority != remoteTask.priority ||
+              localTask.category != remoteTask.category ||
+              localTask.tags.join(',') != remoteTask.tags.join(',') ||
+              localTask.reminders.length != remoteTask.reminders.length) {
+            
+            // Conflict! We will keep the local version since this is the active user device.
+            // Mark for update on Supabase.
+            mergedTasks[localTask.id] = localTask;
+            toUpdateRemote.add(localTask);
           }
         }
       }
       
-      // If remote tasks are empty, seed default tasks and sync them!
+      _tasks = mergedTasks.values.toList();
+      await _storageService.saveTasks(_tasks);
+      
+      // 4. Upload local-only tasks to Supabase in background
+      for (var task in toUpload) {
+        try {
+          await _supabaseService.insertTask(task);
+        } catch (e) {
+          debugPrint('Failed to sync local-only task to Supabase: $e');
+        }
+      }
+      
+      // 5. Update conflicted tasks in Supabase in background
+      for (var task in toUpdateRemote) {
+        try {
+          await _supabaseService.updateTask(task);
+        } catch (e) {
+          debugPrint('Failed to sync local-updated task to Supabase: $e');
+        }
+      }
+      
+      // 6. Merge Categories
+      final remoteCategories = await _supabaseService.loadCategories();
+      _categories = await _storageService.loadCategories();
+      
+      bool categoriesChanged = false;
+      for (var entry in _categories.entries) {
+        if (!remoteCategories.containsKey(entry.key)) {
+          try {
+            await _supabaseService.insertCategory(entry.key, entry.value);
+          } catch (e) {
+            debugPrint('Failed to sync local category ${entry.key} to Supabase: $e');
+          }
+        }
+      }
+      
+      for (var entry in remoteCategories.entries) {
+        if (!_categories.containsKey(entry.key)) {
+          _categories[entry.key] = entry.value;
+          categoriesChanged = true;
+        }
+      }
+      
+      if (categoriesChanged) {
+        await _storageService.saveCategories(_categories);
+      }
+      
+      // If remote and local tasks are completely empty, seed default tasks and sync them!
       final hasSeeded = await _storageService.hasSeeded();
       if (!hasSeeded && _tasks.isEmpty) {
         await _seedDefaultData();
@@ -171,9 +266,12 @@ class TaskProvider extends ChangeNotifier {
       _notificationService.updateMonitoredTasks(_tasks);
     } catch (e) {
       debugPrint('Failed to refresh from Supabase: $e');
-      // If error occurs, fallback to local cached values
+      // Fallback to local cached values
       _tasks = await _storageService.loadTasks();
       _categories = await _storageService.loadCategories();
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 
@@ -258,12 +356,24 @@ class TaskProvider extends ChangeNotifier {
     _tasks.removeWhere((t) => t.id == id);
     await _storageService.saveTasks(_tasks);
     _notificationService.updateMonitoredTasks(_tasks);
+    
+    // Track offline deletions
+    final deletedIds = await _storageService.loadDeletedTaskIds();
+    if (!deletedIds.contains(id)) {
+      deletedIds.add(id);
+      await _storageService.saveDeletedTaskIds(deletedIds);
+    }
+    
     notifyListeners();
     
     // Sync to Supabase in background
     if (_supabaseService.isActive && _supabaseService.isLoggedIn) {
       try {
         await _supabaseService.deleteTask(id);
+        // Successful delete: remove from offline delete tracker
+        final currentDeleted = await _storageService.loadDeletedTaskIds();
+        currentDeleted.remove(id);
+        await _storageService.saveDeletedTaskIds(currentDeleted);
       } catch (e) {
         debugPrint('Failed to sync deleteTask to Supabase: $e');
       }
@@ -352,19 +462,38 @@ class TaskProvider extends ChangeNotifier {
 
   // Authentication operations
   Future<void> login(String username, {String? clientName}) async {
-    // Offline bypass/guest login
-    _isLoggedIn = true;
-    _username = username;
-    _clientName = clientName ?? 'Default Client';
-    await _storageService.saveLoginStatus(true);
-    await _storageService.saveUsername(username);
-    await _storageService.saveClientName(_clientName);
-    
-    // Load local tasks
-    _tasks = await _storageService.loadTasks();
-    _categories = await _storageService.loadCategories();
-    await cleanupCompletedTasks();
+    _isLoading = true;
     notifyListeners();
+    try {
+      _isLoggedIn = true;
+      _username = username;
+      _clientName = clientName ?? 'Default Client';
+      await _storageService.saveLoginStatus(true);
+      await _storageService.saveUsername(username);
+      await _storageService.saveClientName(_clientName);
+
+      // Try anonymous Supabase sign-in
+      if (_supabaseService.isActive && !_supabaseService.isLoggedIn) {
+        try {
+          await _supabaseService.signInAnonymously();
+          _username = 'Guest_${_supabaseService.currentUser?.id.substring(0, 5) ?? 'User'}';
+          await _storageService.saveUsername(_username);
+        } catch (e) {
+          debugPrint('Failed Supabase anonymous sign-in: $e');
+        }
+      }
+
+      if (_supabaseService.isActive && _supabaseService.isLoggedIn) {
+        await refreshFromSupabase();
+      } else {
+        _tasks = await _storageService.loadTasks();
+        _categories = await _storageService.loadCategories();
+      }
+      await cleanupCompletedTasks();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> signUpWithSupabase(String email, String password, {String? clientName}) async {
@@ -475,19 +604,25 @@ class TaskProvider extends ChangeNotifier {
     }
     
     if (toDelete.isNotEmpty) {
+      final deletedIds = await _storageService.loadDeletedTaskIds();
       for (var task in toDelete) {
         _tasks.removeWhere((t) => t.id == task.id);
+        if (!deletedIds.contains(task.id)) {
+          deletedIds.add(task.id);
+        }
         
         // Sync delete to Supabase
         if (_supabaseService.isActive && _supabaseService.isLoggedIn) {
           try {
             await _supabaseService.deleteTask(task.id);
+            deletedIds.remove(task.id);
           } catch (e) {
             debugPrint('Failed to sync auto-delete task to Supabase: $e');
           }
         }
       }
       
+      await _storageService.saveDeletedTaskIds(deletedIds);
       await _storageService.saveTasks(_tasks);
       _notificationService.updateMonitoredTasks(_tasks);
       notifyListeners();

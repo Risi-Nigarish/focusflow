@@ -105,6 +105,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(width: 16),
+              // Cloud Sync Status Indicator
+              _buildSyncIndicator(context, provider, isDark),
+              const SizedBox(width: 12),
               // Mini statistics indicator
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -848,6 +851,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         })(),
       ],
+    );
+  }
+
+  Widget _buildSyncIndicator(BuildContext context, TaskProvider provider, bool isDark) {
+    IconData icon;
+    Color color;
+    String tooltip;
+    Widget child;
+
+    if (!provider.isSupabaseConfigured) {
+      icon = Icons.cloud_off_outlined;
+      color = Colors.grey;
+      tooltip = 'Supabase Database Not Configured';
+      child = Icon(icon, color: color, size: 16);
+    } else if (provider.isSyncing) {
+      color = isDark ? AppTheme.darkAccent : AppTheme.lightAccent;
+      tooltip = 'Syncing tasks with Supabase Database...';
+      child = SizedBox(
+        width: 12,
+        height: 12,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+      );
+    } else if (provider.isLoggedIn) {
+      icon = Icons.cloud_done_outlined;
+      color = Colors.greenAccent;
+      tooltip = 'All tasks safely synced with Supabase Database';
+      child = Icon(icon, color: color, size: 16);
+    } else {
+      icon = Icons.cloud_queue_outlined;
+      color = Colors.grey;
+      tooltip = 'Local Offline Cache Mode (No Database Sync)';
+      child = Icon(icon, color: color, size: 16);
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: AppTheme.glassDecoration(isDark: isDark, radius: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            child,
+            const SizedBox(width: 6),
+            Text(
+              provider.isSyncing
+                  ? 'Syncing'
+                  : (provider.isLoggedIn ? 'Synced' : 'Local Only'),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

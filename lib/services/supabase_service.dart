@@ -64,6 +64,18 @@ class SupabaseService {
     await _client!.auth.signOut();
   }
 
+  /// Sign In Anonymously
+  Future<AuthResponse> signInAnonymously() async {
+    if (!isActive) throw SupabaseNotConfiguredException();
+    return await _client!.auth.signInAnonymously();
+  }
+
+  /// Check if the current user is anonymous
+  bool get isAnonymous {
+    if (!isActive || currentUser == null) return false;
+    return currentUser!.isAnonymous;
+  }
+
   // ==========================================
   // Task Database Operations
   // ==========================================
@@ -84,13 +96,66 @@ class SupabaseService {
     return data.map((row) => _taskFromDbMap(row as Map<String, dynamic>)).toList();
   }
 
+  // Set to keep track of columns that the remote database doesn't support
+  final Set<String> _unsupportedTaskColumns = {};
+
+  Map<String, dynamic> _cleanTaskDbMap(Map<String, dynamic> original) {
+    final cleaned = Map<String, dynamic>.from(original);
+    for (var col in _unsupportedTaskColumns) {
+      cleaned.remove(col);
+    }
+    return cleaned;
+  }
+
   /// Insert task into Supabase
   Future<void> insertTask(Task task) async {
     if (!isActive) return;
     final userId = currentUserId;
     if (userId == null) return;
 
-    await _client!.from('tasks').insert(_taskToDbMap(task, userId));
+    final taskMap = _taskToDbMap(task, userId);
+    var attemptMap = _cleanTaskDbMap(taskMap);
+    
+    while (true) {
+      try {
+        await _client!.from('tasks').insert(attemptMap);
+        break;
+      } catch (e) {
+        if (e is PostgrestException) {
+          String? columnName;
+          
+          // Case 1: PostgREST PGRST204 (Could not find the 'col_name' column...)
+          final match1 = RegExp(r"Could not find the '([^']+)' column").firstMatch(e.message);
+          if (match1 != null) {
+            columnName = match1.group(1);
+          }
+          
+          // Case 2: PostgreSQL 42703 (column "col_name" of relation "tasks" does not exist)
+          if (columnName == null) {
+            final match2 = RegExp(r'column "([^"]+)" of relation').firstMatch(e.message);
+            if (match2 != null) {
+              columnName = match2.group(1);
+            }
+          }
+          
+          // Case 3: Generic fallback matching quotes indicating column name
+          if (columnName == null && (e.code == 'PGRST204' || e.code == '42703' || e.message.contains('does not exist'))) {
+            final match3 = RegExp(r'column "([^"]+)"').firstMatch(e.message) ??
+                           RegExp(r"column '([^']+)'").firstMatch(e.message);
+            if (match3 != null) {
+              columnName = match3.group(1);
+            }
+          }
+          
+          if (columnName != null) {
+            _unsupportedTaskColumns.add(columnName);
+            attemptMap.remove(columnName);
+            continue; // retry
+          }
+        }
+        rethrow;
+      }
+    }
   }
 
   /// Update task in Supabase
@@ -99,11 +164,53 @@ class SupabaseService {
     final userId = currentUserId;
     if (userId == null) return;
 
-    await _client!
-        .from('tasks')
-        .update(_taskToDbMap(task, userId))
-        .eq('id', task.id)
-        .eq('user_id', userId);
+    final taskMap = _taskToDbMap(task, userId);
+    var attemptMap = _cleanTaskDbMap(taskMap);
+    
+    while (true) {
+      try {
+        await _client!
+            .from('tasks')
+            .update(attemptMap)
+            .eq('id', task.id)
+            .eq('user_id', userId);
+        break;
+      } catch (e) {
+        if (e is PostgrestException) {
+          String? columnName;
+          
+          // Case 1: PostgREST PGRST204 (Could not find the 'col_name' column...)
+          final match1 = RegExp(r"Could not find the '([^']+)' column").firstMatch(e.message);
+          if (match1 != null) {
+            columnName = match1.group(1);
+          }
+          
+          // Case 2: PostgreSQL 42703 (column "col_name" of relation "tasks" does not exist)
+          if (columnName == null) {
+            final match2 = RegExp(r'column "([^"]+)" of relation').firstMatch(e.message);
+            if (match2 != null) {
+              columnName = match2.group(1);
+            }
+          }
+          
+          // Case 3: Generic fallback matching quotes indicating column name
+          if (columnName == null && (e.code == 'PGRST204' || e.code == '42703' || e.message.contains('does not exist'))) {
+            final match3 = RegExp(r'column "([^"]+)"').firstMatch(e.message) ??
+                           RegExp(r"column '([^']+)'").firstMatch(e.message);
+            if (match3 != null) {
+              columnName = match3.group(1);
+            }
+          }
+          
+          if (columnName != null) {
+            _unsupportedTaskColumns.add(columnName);
+            attemptMap.remove(columnName);
+            continue; // retry
+          }
+        }
+        rethrow;
+      }
+    }
   }
 
   /// Delete task from Supabase

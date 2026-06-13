@@ -411,6 +411,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Text(
+                          '* Note: Guest/Bypass tasks are saved temporarily. To sync across devices and prevent data loss, please Sign Up with an email account.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

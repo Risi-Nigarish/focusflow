@@ -73,6 +73,18 @@ class StorageService {
     await prefs.clear();
   }
 
+  static const String _deletedTasksKey = 'focusflow_deleted_tasks';
+
+  Future<List<String>> loadDeletedTaskIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_deletedTasksKey) ?? [];
+  }
+
+  Future<void> saveDeletedTaskIds(List<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_deletedTasksKey, ids);
+  }
+
   Future<bool> loadLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_isLoggedInKey) ?? false;

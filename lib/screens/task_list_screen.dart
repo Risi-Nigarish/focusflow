@@ -48,10 +48,41 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 'Workspace Tasks',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              IconButton(
-                icon: const Icon(Icons.add_task),
-                tooltip: 'Add Task',
-                onPressed: () => _showTaskEditorSheet(context, null),
+              Row(
+                children: [
+                  if (provider.isSupabaseConfigured && provider.isLoggedIn)
+                    IconButton(
+                      icon: provider.isSyncing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                              ),
+                            )
+                          : const Icon(Icons.sync),
+                      tooltip: 'Sync with Cloud Database',
+                      onPressed: provider.isSyncing
+                          ? null
+                          : () async {
+                              await provider.refreshFromSupabase();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Tasks synced successfully with Supabase!'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.add_task),
+                    tooltip: 'Add Task',
+                    onPressed: () => _showTaskEditorSheet(context, null),
+                  ),
+                ],
               ),
             ],
           ),
